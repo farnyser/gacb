@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/python3
 
 import abc
 import random
@@ -52,6 +52,8 @@ class GeneticAlgorithm:
             c = self.solution_cls(self.input, self.data)
             self.bestify(c)
             self.population.append(c)
+        # sort
+        self.population = sorted(self.population, key=operator.attrgetter('score'), reverse=False)
         # die
         for i in range(0, birth+immigration):
             self.population.remove(self.selectInvert())
@@ -59,12 +61,8 @@ class GeneticAlgorithm:
     def select(self):
         """Select a solution.
         The higher the score, the higher the chance
-        of being selected in this method."""
-        #i = 0
-        #while s > self.population[i].score**5:
-        #    s -= self.population[i].score**5
-        #    i = (i + 1) % len(self.population)
-        #return self.population[i]
+        of being selected in this method.
+        The population need to be ordered in a decreasing order"""
         p = .30
         while 1:
             p += .05
@@ -75,7 +73,8 @@ class GeneticAlgorithm:
     def selectInvert(self):
         """Select a solution.
         The lower the score, the higher the chance
-        of being selected in this method."""
+        of being selected in this method.
+        The population need to be ordered in an increasing order"""
         p = .40
         while 1:
             p += .05
@@ -143,17 +142,16 @@ class VigenereSolution(Solution):
         coeff = 0
         for k in self.language.keys():
             f = self.language[k]
-            fc = self.frequency(text, k)
             if f < 1:
+                fc = self.frequency(text, k)
                 score += 1 - abs(f - fc)/max(f, fc)
                 coeff += 1
             else:
-                if fc > 0:
-                    score += 1
-                    coeff += 1
-                # score += min(1, f * fc)
+                c = text.count(k)
+                if c > 0:
+                    score += f*c
+                    coeff += f*c
         return score/coeff
-        #return score/len(self.language)
     
     # get frequency of a given chunck in the global text
     def frequency(self, text, chunck):
@@ -174,12 +172,20 @@ class VigenereSolution(Solution):
     
     # merge two solution (this and b)
     def merge(self, ct : "ciphered text (for scoring)", b : "other solution"):
-        sa = max(1, random.randrange(0, len(self.key)))
-        sb = max(1, random.randrange(0, len(b.key)))
+        k_max = max(len(self.key), len(b.key))
+        a_s = len(self.key)
+        b_s = len(b.key)
         c = VigenereSolution("", self.data)
         c.key = ""
-        c.key += (self.key[:sa])
-        c.key += (b.key[sb:])
+        for i in range(0, k_max):
+            while len(c.key) <= i:
+                r = random.randrange(0, 100)
+                if r < 50 and i < a_s:
+                    c.key += self.key[i]
+                elif r < 98 and i < b_s:
+                    c.key += b.key[i]
+                elif i > 0:
+                    break
         c.score = c.eval(ct)
         return c
     
@@ -295,20 +301,23 @@ french = {
     'vous' : 1,
     'droit' : 1,
     'gauche' : 1,
-    'presque' : 1
+    'presque' : 1,
+    'chacun' : 1,
+    'parfois' : 1,
+    'depuis' : 1
 }
 
 # execute demo
 if __name__ == "__main__":
     import sys
-    
+
     key="hello"
     pt = "le repassage extreme est un melange de sport extreme et d'art de performance, dans lequel les adeptes installent une planche a repasser dans un lieu incongru, de preference dangereux, pour repasser quelques vetements. le site officiel le decrit comme le dernier sport a haut risque qui combine les frissons d'une activite extreme et la satisfaction d'une chemise bien repassee. le repassage extreme se pratique seul ou en groupe, il a deja ete pratique dans les lieux suivants : en haut d'une montagne apres l'avoir escaladee, dans une foret, en canoe, a ski ou en snowboard, au sommet d'une statue, au milieu d'une rue, sous l'eau ou encore sous la glace d'un lac gele.Un journal anglais a ecrit que cette activite s'inscrivait dans la traditionnelle excentricite britannique. l'interet des medias pour le repassage extreme tient plus a la question de savoir si c'est veritablement un sport qu'a l'activite elle-meme. les partisans de ce sport pretendent que tout a demarre en 1997 avec phil shaw, un habitant de leicester employe dans une usine de vetements en laine. alors qu'il rentrait d'une dure journee de labeur, il se retrouva devant sa pile de repassage. preferant passer la soiree a faire un peu d'escalade, il decida de combiner les deux activites et crea un nouveau sport extreme. en juin 1999, m.shaw, qui se fait surnommer steam (vapeur), debuta une tournee internationale pour promouvoir cette decouverte. ses principales etapes furent les etats-unis, les iles fidji, la nouvelle-zelande, l'australie et l'afrique du sud. une rencontre avec des touristes allemands en nouvelle-zelande provoqua la creation d'un groupe appele extreme ironing international et de son pendant germanique german extreme ironing section"
     ps = 1000
-    birthRate = 1/3.0
-    immigrationRate = 1/3.0
+    birthRate = .40
+    immigrationRate = .10
     
-    print("usage: [key [population_size [birth_rate immigration_rate]]]")
+    print("usage: [echo message |] pygacb.py [key [population_size [birth_rate immigration_rate]]]")
     
     if len(sys.argv) >= 5:
         birthRate = float(sys.argv[3])    
@@ -317,6 +326,9 @@ if __name__ == "__main__":
         ps = int(sys.argv[2])    
     if len(sys.argv) >= 2:
         key = sys.argv[1]
+    
+    if sys.stdin.isatty() == False:
+        pt = sys.stdin.read()
         
     charset = "azertyuiopqsdfghjklmwxcvbn0123456789"
     vigenere = Vigenere(charset)
